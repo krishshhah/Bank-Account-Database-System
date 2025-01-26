@@ -33,8 +33,8 @@ CREATE TABLE `user_accounts` (
     `user_id` INT,
     `account_id` INT,
     PRIMARY KEY (`user_id`, `account_id`),
-    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`),
-    FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`)
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- records all transfers/payments between users
