@@ -12,11 +12,11 @@ CREATE TABLE `users` (
 -- table for all accounts a user may have
 CREATE TABLE `accounts` (
     `id` INT UNSIGNED AUTO_INCREMENT,
-    `type` ENUM('savings', 'current', 'fixed deposit', 'money market', 'CD'), -- different account types
-    `balance` DECIMAL(12,2) NOT NULL DEFAULT 0 CHECK(`balance` >= 0), -- ensuring no negtative values
-    `bank_id` INT,
+    `type` ENUM('savings', 'current', 'fixed deposit', 'money market', 'CD') NOT NULL, -- different account types
+    `balance` DECIMAL(12,2) NOT NULL DEFAULT 0, -- ensuring no negative values
+    `bank_id` INT UNSIGNED,
     PRIMARY KEY (`id`),
-    FOREIGN KEY (`bank_id`) REFERENCES `banks`(`id`)
+    FOREIGN KEY (`bank_id`) REFERENCES `banks`(`id`) ON DELETE CASCADE ON UPDATE CASCADE -- optional actions
 );
 
 -- table for all the financial institutions
