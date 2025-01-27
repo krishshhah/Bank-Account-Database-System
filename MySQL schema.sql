@@ -134,7 +134,7 @@ FOR EACH ROW
 BEGIN
     -- Log only if the balance has changed
     IF NEW.`balance` != OLD.`balance` THEN
-        INSERT INTO `account_balance_history` (`account_id`, `balance`, `updated_at`)
+        INSERT INTO `account_balance_history` (`account_id`, `balance`, `timestamp`)
         VALUES (NEW.`id`, NEW.`balance`, NOW());
     END IF;
 END //
