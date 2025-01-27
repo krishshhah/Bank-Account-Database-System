@@ -30,8 +30,8 @@ CREATE TABLE `banks` (
 
 -- connecting users to accounts: one to many
 CREATE TABLE `user_accounts` (
-    `user_id` INT,
-    `account_id` INT,
+    `user_id` INT UNSIGNED,
+    `account_id` INT UNSIGNED,
     PRIMARY KEY (`user_id`, `account_id`),
     FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
@@ -43,32 +43,39 @@ CREATE TABLE `transactions` (
     `date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `description` TEXT DEFAULT NULL,
     `amount` DECIMAL(12,2) NOT NULL DEFAULT 0 CHECK(`amount` >= 0),
-    `from_account_id` INT NOT NULL,
-    `to_account_id` INT NOT NULL,
+    `from_account_id` INT UNSIGNED NOT NULL,
+    `to_account_id` INT UNSIGNED NOT NULL,
     PRIMARY KEY (`id`),
-    FOREIGN KEY (`from_account_id`) REFERENCES `accounts`(`id`),
-    FOREIGN KEY (`to_account_id`) REFERENCES `accounts`(`id`)
+    FOREIGN KEY (`from_account_id`) REFERENCES `accounts`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (`to_account_id`) REFERENCES `accounts`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- allows files, photos, invoices, to be linked to certain transactions: many to one.
 CREATE TABLE `attachments` (
     `id` INT UNSIGNED AUTO_INCREMENT,
-    `transaction_id` INT,
+    `transaction_id` INT UNSIGNED,
     `file_name` VARCHAR(100) NOT NULL,
     `file_type` CHAR(5) NOT NULL,
     `file` LONGBLOB,
     PRIMARY KEY(`id`),
-    FOREIGN KEY(`transaction_id`) REFERENCES `transactions`(`id`)
+    FOREIGN KEY(`transaction_id`) REFERENCES `transactions`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- makes changes to account balances for every new transaction, automatically
+DELIMITER //
+
 CREATE TRIGGER `payment`
 BEFORE INSERT ON `transactions`
 FOR EACH ROW
 BEGIN
+    DECLARE from_balance DECIMAL(12, 2);
+
     -- Check if the "from_account_id" has sufficient balance
-    SELECT @from_balance = `balance` FROM `accounts` WHERE `id` = NEW.`from_account_id`;
-    IF @from_balance < NEW.`amount` THEN
+    SELECT `balance` INTO from_balance
+    FROM `accounts`
+    WHERE `id` = NEW.`from_account_id`;
+
+    IF from_balance < NEW.`amount` THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Insufficient balance';
     END IF;
 
@@ -81,44 +88,58 @@ BEGIN
     UPDATE `accounts`
     SET `balance` = `balance` + NEW.`amount`
     WHERE `id` = NEW.`to_account_id`;
-END;
+END //
+
+DELIMITER ;
 
 -- Additional check to ensure balance is positive
+DELIMITER //
+
 CREATE TRIGGER `check_balance`
-AFTER UPDATE OF `balance` ON `accounts`
+AFTER UPDATE ON `accounts`
 FOR EACH ROW
 BEGIN
     IF NEW.`balance` < 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Negative balance not allowed';
     END IF;
-END;
+END //
+
+DELIMITER ;
+
 
 -- creates a summary of all the user's accounts and balances
 CREATE VIEW `user_account_summary` AS
 SELECT `u`.`id` AS `user_id`, `u`.`first_name`, `u`.`last_name`, `a`.`id` AS `account_id`, `a`.`type`, `a`.`balance`
-FROM `users`
+FROM `users` `u`
 INNER JOIN `user_accounts` ua ON `ua`.`user_id` = `u`.`id`
-INNER JOIN `accounts` a ON `ua`.`account_id` = `a`.`id`
+INNER JOIN `accounts` `a` ON `ua`.`account_id` = `a`.`id`
 ORDER BY `u`.`id`;
 
 -- records the changes in balance of an account
 CREATE TABLE `account_balance_history` (
     `id` INT UNSIGNED AUTO_INCREMENT,
-    `account_id` INT,
+    `account_id` INT UNSIGNED,
     `balance` DECIMAL(10,2) NOT NULL,
     `timestamp` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY(`id`),
-    FOREIGN KEY(`account_id`) REFERENCES `accounts`(`id`)
+    FOREIGN KEY(`account_id`) REFERENCES `accounts`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- after every update of balance due to a transaction, the new balance is recorded and added to the `account_balance_history` table
+DELIMITER //
+
 CREATE TRIGGER `track_balance_history`
-AFTER UPDATE OF `balance` ON `accounts`
+AFTER UPDATE ON `accounts`
 FOR EACH ROW
 BEGIN
-    INSERT INTO `account_balance_history` (`account_id`, `balance`)
-    VALUES (NEW.`id`, NEW.`balance`);
-END;
+    -- Log only if the balance has changed
+    IF NEW.`balance` != OLD.`balance` THEN
+        INSERT INTO `account_balance_history` (`account_id`, `balance`, `updated_at`)
+        VALUES (NEW.`id`, NEW.`balance`, NOW());
+    END IF;
+END //
+
+DELIMITER ;
 
 -- displays a user's activity, in terms of amount and the number of their transactions MADE
 CREATE VIEW `debits` AS
