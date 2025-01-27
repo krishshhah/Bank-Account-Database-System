@@ -126,3 +126,6 @@ LIMIT 1;
 -- Creating a new transaction
 INSERT INTO "transactions" ("id", "amount", "from_account_id", "to_account_id")
 VALUES (1, 1000, 1000, 1001);
+
+INSERT INTO transactions (amount, from_account_id, to_account_id)
+VALUES (100.00, 2, 1);
